@@ -205,7 +205,7 @@ class Pypi2spec(object):
     needed for the spec file.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, version=None):
         """ Constructor.
         :arg name, the name of the library on the pypi website.
         """
@@ -213,7 +213,7 @@ class Pypi2spec(object):
         self.description = ''
         self.log = get_logger()
         #self.log.setLevel(logging.DEBUG)
-        self.version = ''
+        self.version = version
         self.summary = ''
         self.license = ''
         self.url = 'http://pypi.python.org/pypi/%s' % name
@@ -318,18 +318,20 @@ class Pypi2spec(object):
         """
         import json
         import collections
-        URLTEMPL = 'https://pypi.python.org/pypi/%s/json'
+        URLTEMPL = 'https://pypi.python.org/pypi/%s/%s/json'
         try:
-            fp = urllib2.urlopen(URLTEMPL % self.name)
+            LOG.debug(URLTEMPL % (self.name, self.version))
+            fp = urllib2.urlopen(URLTEMPL % (self.name,self.version))
             data = json.load(fp, object_pairs_hook=collections.OrderedDict)
         except urllib2.HTTPError as err:
             self.log.debug('ERROR while downloading metadata:\n  %s'
                            % err)
             raise Pypi2specError('Could not retrieve information for the'
-                                 'project "%s". Did you make a typo?'
-                                 % self.name)
+                                 'project "%s" release "%s". Did you make a typo?'
+                                 % (self.name,self.version))
 
-        self.version = data[u'info'][u'version']
+        if not self.version:
+            self.version = data[u'info'][u'version']
         self.summary = data[u'info'][u'summary']
         self.description = data[u'info'][u'description']
         
@@ -391,9 +393,14 @@ class Pypi2specUI(object):
                                  version='%(prog)s ' + __version__)
         self.parser.add_argument('package',
                                  help='Name of the pypi library to package.')
+        self.parser.add_argument('--release', type=str,
+                                 help='Choose which package version')
         self.parser.add_argument('--python3', action='store_true',
                                  help='Create a specfile for both ' +
                                  'python2 and python3.')
+        self.parser.add_argument('--sclpython27', action='store_true',
+                                 help='Create a specfile for CentOS scl ' +
+                                 'python27')
         self.parser.add_argument('--verbose', action='store_true',
                                  help='Give more info about what is ' +
                                  'going on.')
@@ -415,14 +422,14 @@ class Pypi2specUI(object):
             if args.debug:
                 self.log.setLevel('DEBUG')
 
-            pypi = Pypi2spec(args.package)
+            pypi = Pypi2spec(args.package, args.release)
             pypi.retrieve_info()
             pypi.download()
             pypi.extract_sources()
             pypi.determine_arch()
             pypi.remove_sources()
             settings = Settings()
-            spec = Spec(settings, pypi, python3=args.python3)
+            spec = Spec(settings, pypi, python3=args.python3, sclpython27=args.sclpython27, version=args.release)
             spec.fill_spec_info()
             spec.get_template()
             spec.write_spec()

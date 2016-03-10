@@ -91,15 +91,17 @@ class Spec:
         Write the spec file.
     """
 
-    def __init__(self, settings, package=None, python3=False):
+    def __init__(self, settings, package=None, python3=False, sclpython27=False, version=None):
         """ Constructor.
         """
         self.package = package
+        self.package.version = version
         self.settings = settings
         self.__dict = {}
         self.log = get_logger()
         self.spec = None
         self.python3 = python3
+        self.sclpython27 = sclpython27
 
     def fill_spec_info(self):
         """ Fills the different variable required for the spec file. """
@@ -157,7 +159,10 @@ class Spec:
         """ Read the empty template and fills it with the information
         retrieved.
         """
-        template = '%s/specfile.tpl' % os.path.dirname(__file__)
+	if self.sclpython27:
+            template = '%s/specfile-sclpython27.tpl' % os.path.dirname(__file__)
+        else:
+            template = '%s/specfile.tpl' % os.path.dirname(__file__)
         self.log.info('Filling spec template')
         try:
             stream = open(template, 'r')
